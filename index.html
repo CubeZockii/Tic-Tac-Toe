@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tic Tac Toe</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #1e3a8a, #9333ea);
@@ -40,6 +41,9 @@
         @keyframes flash {
             50% { opacity: 0.5; }
         }
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen">
@@ -48,8 +52,13 @@
     
     <div class="flex gap-4 mb-6">
         <button onclick="startGame(false)" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded text-lg">2 Spieler</button>
-        <button onclick="toggleDifficulty()" class="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded text-lg">KI-Stufe: <span id="difficulty">Leicht</span></button>
-        <button onclick="startGame(true)" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded text-lg">Gegen KI</button>
+        <button onclick="showMultiplayerMenu()" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded text-lg">Multiplayer</button>
+    </div>
+
+    <div id="multiplayer-menu" class="hidden flex flex-col items-center gap-2">
+        <button onclick="createRoom()" class="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded text-lg">Raum erstellen</button>
+        <button onclick="joinRoom()" class="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded text-lg">Raum beitreten</button>
+        <p id="room-info" class="text-lg mt-2"></p>
     </div>
 
     <div id="board" class="board">
@@ -69,21 +78,17 @@
     <script>
         let board = ["", "", "", "", "", "", "", "", ""];
         let currentPlayer = "X";
-        let aiMode = false;
         let gameOver = false;
-        let difficulty = 0;
-        const difficulties = ["Leicht", "Mittel", "Schwierig", "Unschlagbar"];
+        let onlineMode = false;
+        let roomCode = "";
 
-        function toggleDifficulty() {
-            difficulty = (difficulty + 1) % 4;
-            document.getElementById("difficulty").textContent = difficulties[difficulty];
-        }
+        const socket = io();
 
-        function startGame(ai) {
+        function startGame(online) {
             board = ["", "", "", "", "", "", "", "", ""];
             currentPlayer = "X";
-            aiMode = ai;
             gameOver = false;
+            onlineMode = online;
             document.getElementById("status").textContent = "";
             document.querySelectorAll(".cell").forEach(cell => {
                 cell.textContent = "";
@@ -94,6 +99,14 @@
         function makeMove(index) {
             if (board[index] || gameOver) return;
 
+            if (onlineMode) {
+                socket.emit("make_move", { room: roomCode, index: index });
+            } else {
+                localMove(index);
+            }
+        }
+
+        function localMove(index) {
             board[index] = currentPlayer;
             document.querySelectorAll(".cell")[index].textContent = currentPlayer;
 
@@ -102,83 +115,59 @@
                 document.getElementById("status").textContent = `${currentPlayer} gewinnt!`;
                 highlightWinner(winningPattern);
                 gameOver = true;
-                setTimeout(() => startGame(aiMode), 2000);
+                setTimeout(() => startGame(false), 2000);
                 return;
             }
 
             if (board.every(cell => cell !== "")) {
                 document.getElementById("status").textContent = "Unentschieden!";
                 gameOver = true;
-                setTimeout(() => startGame(aiMode), 2000);
+                setTimeout(() => startGame(false), 2000);
                 return;
             }
 
             currentPlayer = currentPlayer === "X" ? "O" : "X";
-
-            if (aiMode && currentPlayer === "O" && !gameOver) {
-                setTimeout(aiMove, 500);
-            }
-        }
-
-        function aiMove() {
-            let bestMove;
-            switch (difficulty) {
-                case 0: bestMove = easyMove(); break;
-                case 1: bestMove = mediumMove(); break;
-                case 2: bestMove = hardMove(); break;
-                case 3: bestMove = minimax(board, "O").index; break;
-            }
-            makeMove(bestMove);
-        }
-
-        function easyMove() {
-            let emptyCells = board.map((val, idx) => val === "" ? idx : null).filter(v => v !== null);
-            return emptyCells[Math.floor(Math.random() * emptyCells.length)];
-        }
-
-        function mediumMove() {
-            return Math.random() < 0.5 ? minimax(board, "O").index : easyMove();
-        }
-
-        function hardMove() {
-            return Math.random() < 0.8 ? minimax(board, "O").index : easyMove();
-        }
-
-        function minimax(newBoard, player) {
-            let emptyCells = newBoard.map((val, idx) => val === "" ? idx : null).filter(v => v !== null);
-
-            if (checkWinnerState(newBoard, "X")) return { score: -10 };
-            if (checkWinnerState(newBoard, "O")) return { score: 10 };
-            if (emptyCells.length === 0) return { score: 0 };
-
-            let moves = emptyCells.map(i => {
-                newBoard[i] = player;
-                let score = player === "O" ? minimax(newBoard, "X").score : minimax(newBoard, "O").score;
-                newBoard[i] = "";
-                return { index: i, score };
-            });
-
-            return moves.reduce((bestMove, move) => (player === "O" ? move.score > bestMove.score : move.score < bestMove.score) ? move : bestMove);
         }
 
         function checkWinner() {
             const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (let pattern of winPatterns) {
-                if (board[pattern[0]] && board[pattern[0]] === board[pattern[1]] && board[pattern[1]] === board[pattern[2]]) {
-                    return pattern;
-                }
-            }
-            return null;
+            return winPatterns.find(pattern => pattern.every(i => board[i] === currentPlayer));
         }
 
         function highlightWinner(pattern) {
             pattern.forEach(i => document.querySelectorAll(".cell")[i].classList.add("winner"));
         }
 
-        function checkWinnerState(testBoard, player) {
-            const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            return winPatterns.some(pattern => pattern.every(i => testBoard[i] === player));
+        function showMultiplayerMenu() {
+            document.getElementById("multiplayer-menu").classList.toggle("hidden");
         }
+
+        function createRoom() {
+            socket.emit("create_room");
+        }
+
+        function joinRoom() {
+            roomCode = prompt("Gib den Raumcode ein:");
+            socket.emit("join_room", { room: roomCode });
+        }
+
+        socket.on("room_created", (data) => {
+            roomCode = data.room;
+            document.getElementById("room-info").textContent = "Raumcode: " + roomCode;
+            onlineMode = true;
+        });
+
+        socket.on("room_joined", () => {
+            document.getElementById("room-info").textContent = "Beigetreten: " + roomCode;
+            onlineMode = true;
+        });
+
+        socket.on("update_board", (data) => {
+            board = data.board;
+            document.querySelectorAll(".cell").forEach((cell, i) => {
+                cell.textContent = board[i];
+            });
+        });
     </script>
 
 </body>
