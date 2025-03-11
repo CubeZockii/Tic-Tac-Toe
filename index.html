@@ -99,7 +99,7 @@
 
             let winningPattern = checkWinner();
             if (winningPattern) {
-                document.getElementById("status").textContent = `${currentPlayer} gewinnt!`;
+                document.getElementById("status").textContent = `${currentPlayer} Won!`;
                 highlightWinner(winningPattern);
                 gameOver = true;
                 setTimeout(() => startGame(aiMode), 2000);
@@ -107,7 +107,7 @@
             }
 
             if (board.every(cell => cell !== "")) {
-                document.getElementById("status").textContent = "Unentschieden!";
+                document.getElementById("status").textContent = "draw!";
                 gameOver = true;
                 setTimeout(() => startGame(aiMode), 2000);
                 return;
