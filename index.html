@@ -33,13 +33,6 @@
         .cell:hover {
             background: rgba(255, 255, 255, 0.4);
         }
-        .winner {
-            background: rgba(34, 197, 94, 0.6) !important;
-            animation: flash 1s infinite;
-        }
-        @keyframes flash {
-            50% { opacity: 0.5; }
-        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen">
@@ -48,6 +41,7 @@
     
     <div class="flex gap-4 mb-6">
         <button onclick="startGame(false)" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded text-lg">2 Spieler</button>
+        <button onclick="toggleDifficulty()" class="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded text-lg">KI-Stufe: <span id="difficulty">Leicht</span></button>
         <button onclick="startGame(true)" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded text-lg">Gegen KI</button>
     </div>
 
@@ -70,6 +64,13 @@
         let currentPlayer = "X";
         let aiMode = false;
         let gameOver = false;
+        let difficulty = 0; // 0 = Leicht, 1 = Mittel, 2 = Schwer
+        const difficulties = ["Leicht", "Mittel", "Schwer"];
+
+        function toggleDifficulty() {
+            difficulty = (difficulty + 1) % 3;
+            document.getElementById("difficulty").textContent = difficulties[difficulty];
+        }
 
         function startGame(ai) {
             board = ["", "", "", "", "", "", "", "", ""];
@@ -79,7 +80,6 @@
             document.getElementById("status").textContent = "";
             document.querySelectorAll(".cell").forEach(cell => {
                 cell.textContent = "";
-                cell.classList.remove("winner");
             });
         }
 
@@ -91,16 +91,15 @@
 
             if (checkWinner()) {
                 document.getElementById("status").textContent = `${currentPlayer} gewinnt!`;
-                highlightWinner();
                 gameOver = true;
-                setTimeout(() => startGame(aiMode), 2000); // Automatischer Neustart
+                setTimeout(() => startGame(aiMode), 2000);
                 return;
             }
 
             if (board.every(cell => cell !== "")) {
                 document.getElementById("status").textContent = "Unentschieden!";
                 gameOver = true;
-                setTimeout(() => startGame(aiMode), 2000); // Automatischer Neustart
+                setTimeout(() => startGame(aiMode), 2000);
                 return;
             }
 
@@ -112,8 +111,24 @@
         }
 
         function aiMove() {
-            let bestMove = minimax(board, "O").index;
+            let bestMove;
+            if (difficulty === 0) {
+                bestMove = easyMove();
+            } else if (difficulty === 1) {
+                bestMove = mediumMove();
+            } else {
+                bestMove = minimax(board, "O").index;
+            }
             makeMove(bestMove);
+        }
+
+        function easyMove() {
+            let emptyCells = board.map((val, idx) => val === "" ? idx : null).filter(v => v !== null);
+            return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        }
+
+        function mediumMove() {
+            return Math.random() < 0.5 ? minimax(board, "O").index : easyMove();
         }
 
         function minimax(newBoard, player) {
@@ -145,11 +160,7 @@
         }
 
         function checkWinner() {
-            const winPatterns = [
-                [0, 1, 2], [3, 4, 5], [6, 7, 8], 
-                [0, 3, 6], [1, 4, 7], [2, 5, 8], 
-                [0, 4, 8], [2, 4, 6] 
-            ];
+            const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
             return winPatterns.some(pattern => 
                 board[pattern[0]] !== "" &&
                 board[pattern[0]] === board[pattern[1]] &&
@@ -158,29 +169,12 @@
         }
 
         function checkWinnerState(testBoard, player) {
-            const winPatterns = [
-                [0, 1, 2], [3, 4, 5], [6, 7, 8], 
-                [0, 3, 6], [1, 4, 7], [2, 5, 8], 
-                [0, 4, 8], [2, 4, 6] 
-            ];
+            const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
             return winPatterns.some(pattern => 
                 testBoard[pattern[0]] === player &&
                 testBoard[pattern[1]] === player &&
                 testBoard[pattern[2]] === player
             );
-        }
-
-        function highlightWinner() {
-            const winPatterns = [
-                [0, 1, 2], [3, 4, 5], [6, 7, 8], 
-                [0, 3, 6], [1, 4, 7], [2, 5, 8], 
-                [0, 4, 8], [2, 4, 6] 
-            ];
-            winPatterns.forEach(pattern => {
-                if (board[pattern[0]] && board[pattern[0]] === board[pattern[1]] && board[pattern[1]] === board[pattern[2]]) {
-                    pattern.forEach(i => document.querySelectorAll(".cell")[i].classList.add("winner"));
-                }
-            });
         }
     </script>
 
