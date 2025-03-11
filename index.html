@@ -47,9 +47,9 @@
     <h1 class="text-5xl font-bold mb-4">Tic Tac Toe</h1>
 
     <div class="flex gap-4 mb-6">
-        <button onclick="startGame(false)" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded text-lg">2 Spieler</button>
-        <button onclick="toggleDifficulty()" class="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded text-lg">KI-Stufe: <span id="difficulty">Leicht</span></button>
-        <button onclick="startGame(true)" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded text-lg">Gegen KI</button>
+        <button onclick="startGame(false)" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded text-lg">2 Player</button>
+        <button onclick="toggleDifficulty()" class="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded text-lg">Niveau Ki: <span id="difficulty">Easy</span></button>
+        <button onclick="startGame(true)" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded text-lg">Against KI</button>
     </div>
 
     <div id="board" class="board">
@@ -72,7 +72,7 @@
         let aiMode = false;
         let gameOver = false;
         let difficulty = 0;
-        const difficulties = ["Leicht", "Mittel", "Schwierig", "Unschlagbar"];
+        const difficulties = ["Easy", "Medium", "Hard", "Imbattable"];
 
         function toggleDifficulty() {
             difficulty = (difficulty + 1) % 4;
