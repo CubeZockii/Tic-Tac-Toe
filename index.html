@@ -33,6 +33,13 @@
         .cell:hover {
             background: rgba(255, 255, 255, 0.4);
         }
+        .winner {
+            background: rgba(34, 197, 94, 0.6) !important;
+            animation: flash 1s infinite;
+        }
+        @keyframes flash {
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen">
@@ -64,7 +71,7 @@
         let currentPlayer = "X";
         let aiMode = false;
         let gameOver = false;
-        let difficulty = 0; // 0 = Leicht, 1 = Mittel, 2 = Schwer
+        let difficulty = 0;
         const difficulties = ["Leicht", "Mittel", "Schwer"];
 
         function toggleDifficulty() {
@@ -80,6 +87,7 @@
             document.getElementById("status").textContent = "";
             document.querySelectorAll(".cell").forEach(cell => {
                 cell.textContent = "";
+                cell.classList.remove("winner");
             });
         }
 
@@ -89,8 +97,10 @@
             board[index] = currentPlayer;
             document.querySelectorAll(".cell")[index].textContent = currentPlayer;
 
-            if (checkWinner()) {
+            let winningPattern = checkWinner();
+            if (winningPattern) {
                 document.getElementById("status").textContent = `${currentPlayer} gewinnt!`;
+                highlightWinner(winningPattern);
                 gameOver = true;
                 setTimeout(() => startGame(aiMode), 2000);
                 return;
@@ -111,14 +121,7 @@
         }
 
         function aiMove() {
-            let bestMove;
-            if (difficulty === 0) {
-                bestMove = easyMove();
-            } else if (difficulty === 1) {
-                bestMove = mediumMove();
-            } else {
-                bestMove = minimax(board, "O").index;
-            }
+            let bestMove = difficulty === 0 ? easyMove() : difficulty === 1 ? mediumMove() : minimax(board, "O").index;
             makeMove(bestMove);
         }
 
@@ -138,43 +141,33 @@
             if (checkWinnerState(newBoard, "O")) return { score: 10 };
             if (emptyCells.length === 0) return { score: 0 };
 
-            let moves = [];
-            for (let i of emptyCells) {
-                let move = {};
-                move.index = i;
+            let moves = emptyCells.map(i => {
                 newBoard[i] = player;
-
-                if (player === "O") {
-                    move.score = minimax(newBoard, "X").score;
-                } else {
-                    move.score = minimax(newBoard, "O").score;
-                }
-
+                let score = player === "O" ? minimax(newBoard, "X").score : minimax(newBoard, "O").score;
                 newBoard[i] = "";
-                moves.push(move);
-            }
+                return { index: i, score };
+            });
 
-            return moves.reduce((bestMove, move) => 
-                (player === "O" ? move.score > bestMove.score : move.score < bestMove.score) ? move : bestMove
-            , moves[0]);
+            return moves.reduce((bestMove, move) => (player === "O" ? move.score > bestMove.score : move.score < bestMove.score) ? move : bestMove);
         }
 
         function checkWinner() {
             const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            return winPatterns.some(pattern => 
-                board[pattern[0]] !== "" &&
-                board[pattern[0]] === board[pattern[1]] &&
-                board[pattern[1]] === board[pattern[2]]
-            );
+            for (let pattern of winPatterns) {
+                if (board[pattern[0]] && board[pattern[0]] === board[pattern[1]] && board[pattern[1]] === board[pattern[2]]) {
+                    return pattern;
+                }
+            }
+            return null;
+        }
+
+        function highlightWinner(pattern) {
+            pattern.forEach(i => document.querySelectorAll(".cell")[i].classList.add("winner"));
         }
 
         function checkWinnerState(testBoard, player) {
             const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            return winPatterns.some(pattern => 
-                testBoard[pattern[0]] === player &&
-                testBoard[pattern[1]] === player &&
-                testBoard[pattern[2]] === player
-            );
+            return winPatterns.some(pattern => pattern.every(i => testBoard[i] === player));
         }
     </script>
 
