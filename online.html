@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Tic-Tac-Toe</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #282c34;
+            color: white;
+            text-align: center;
+        }
+        .container {
+            background: #3b3f47;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        .room-section {
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #61dafb;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #4fa3d1;
+        }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 5px;
+            margin-top: 20px;
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            background: #444;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .cell:hover {
+            background: #555;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Online Tic-Tac-Toe</h1>
+        <div class="room-section">
+            <button id="createRoom">Raum erstellen</button>
+            <input type="text" id="roomCode" placeholder="Raumcode eingeben">
+            <button id="joinRoom">Beitreten</button>
+        </div>
+        <p id="status">Erstelle oder betrete einen Raum</p>
+        <div id="board" class="board hidden">
+            <div class="cell" data-index="0"></div>
+            <div class="cell" data-index="1"></div>
+            <div class="cell" data-index="2"></div>
+            <div class="cell" data-index="3"></div>
+            <div class="cell" data-index="4"></div>
+            <div class="cell" data-index="5"></div>
+            <div class="cell" data-index="6"></div>
+            <div class="cell" data-index="7"></div>
+            <div class="cell" data-index="8"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io("https://tic-tac-toe-app-x6i1.onrender.com"); // Ersetze durch deinen Server
+        const board = document.getElementById("board");
+        const statusText = document.getElementById("status");
+        const createRoomBtn = document.getElementById("createRoom");
+        const joinRoomBtn = document.getElementById("joinRoom");
+        const roomCodeInput = document.getElementById("roomCode");
+        let room = "";
+        let symbol = "";
+        let myTurn = false;
+
+        createRoomBtn.addEventListener("click", () => {
+            socket.emit("create_room");
+        });
+
+        joinRoomBtn.addEventListener("click", () => {
+            room = roomCodeInput.value.trim();
+            if (room) {
+                socket.emit("join", { room });
+            }
+        });
+
+        socket.on("room_created", (data) => {
+            room = data.room;
+            statusText.textContent = `Raum erstellt! Code: ${room}`;
+        });
+
+        socket.on("assign_symbol", (data) => {
+            symbol = data.symbol;
+            statusText.textContent = `Du spielst als ${symbol}`;
+        });
+
+        socket.on("start_game", () => {
+            board.classList.remove("hidden");
+            myTurn = symbol === "X";
+            statusText.textContent = myTurn ? "Dein Zug!" : "Gegner spielt...";
+        });
+
+        socket.on("move_made", (data) => {
+            document.querySelector(`.cell[data-index='${data.index}']`).textContent = data.symbol;
+            myTurn = data.symbol !== symbol;
+            statusText.textContent = myTurn ? "Dein Zug!" : "Gegner spielt...";
+        });
+
+        board.addEventListener("click", (event) => {
+            if (!myTurn) return;
+            let cell = event.target;
+            let index = cell.dataset.index;
+            if (cell.textContent === "") {
+                socket.emit("make_move", { room, index });
+            }
+        });
+    </script>
+</body>
+</html>
