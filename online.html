@@ -102,44 +102,61 @@
     </div>
 
     <script>
-        const socket = io("https://tic-tac-toe-app-f16l.onrender.com"); // Ersetze mit deiner Server-URL
-        let room = "";
-        let playerSymbol = "";
+       const socket = io("https://your-flask-server.com"); // Replace with your actual server URL
+let room = "";
+let playerSymbol = "";
+let currentTurn = "X"; // Track turn locally to prevent unwanted moves
 
-        function createRoom() {
-            room = Math.random().toString(36).substring(2, 8).toUpperCase();
-            document.getElementById("roomInput").value = room;
-            alert("Raum erstellt: " + room);
+function createRoom() {
+    room = Math.random().toString(36).substring(2, 8).toUpperCase();
+    document.getElementById("roomInput").value = room;
+    alert("Room created: " + room);
+}
+
+function joinRoom() {
+    room = document.getElementById("roomInput").value.trim();
+    if (room) {
+        socket.emit("join", room);
+        document.querySelector(".menu").style.display = "none";
+        document.querySelector(".board-container").style.display = "block";
+    }
+}
+
+socket.on("joined", (symbol) => {
+    playerSymbol = symbol;
+    alert("You are playing as " + symbol);
+});
+
+socket.on("full", () => {
+    alert("This room is already full!");
+});
+
+socket.on("update_board", (board) => {
+    document.querySelectorAll(".cell").forEach((cell, index) => {
+        cell.innerText = board[index] || "";
+        cell.classList.toggle("taken", !!board[index]);
+    });
+});
+
+socket.on("game_over", (data) => {
+    if (data.winner === "draw") {
+        alert("It's a draw!");
+    } else {
+        alert(data.winner + " wins!");
+    }
+});
+
+document.querySelectorAll(".cell").forEach(cell => {
+    cell.addEventListener("click", () => {
+        if (!cell.innerText && playerSymbol === currentTurn) {
+            socket.emit("move", { room, index: cell.dataset.index, player: playerSymbol });
         }
+    });
+});
 
-        function joinRoom() {
-            room = document.getElementById("roomInput").value.trim();
-            if (room) {
-                socket.emit("join", room);
-                document.querySelector(".menu").style.display = "none";
-                document.querySelector(".board-container").style.display = "block";
-            }
-        }
-
-        socket.on("joined", (symbol) => {
-            playerSymbol = symbol;
-            alert("Du spielst als " + symbol);
-        });
-
-        socket.on("update_board", (board) => {
-            document.querySelectorAll(".cell").forEach((cell, index) => {
-                cell.innerText = board[index] || "";
-                cell.classList.toggle("taken", !!board[index]);
-            });
-        });
-
-        document.querySelectorAll(".cell").forEach(cell => {
-            cell.addEventListener("click", () => {
-                if (!cell.innerText) {
-                    socket.emit("move", { room, index: cell.dataset.index });
-                }
-            });
-        });
+socket.on("turn", (turn) => {
+    currentTurn = turn;
+});
     </script>
 </body>
 </html>
