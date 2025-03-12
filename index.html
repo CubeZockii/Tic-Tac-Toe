@@ -53,7 +53,7 @@
     <div class="flex gap-4 mb-6">
         <button id="mode-btn" onclick="startGame(false)" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded text-lg">2 Player</button>
         <button id="difficulty-btn" onclick="toggleDifficulty()" class="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded text-lg">AI: <span id="difficulty">Easy</span></button>
-        <button id="ai-btn" onclick="startGame(true)" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded text-lg">Play vs AI</button>
+        <button id="ai-btn" onclick="startGame(true)" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded text-lg">Player vs AI</button>
     </div>
 
     <div id="board" class="board">
@@ -71,13 +71,21 @@
     <p id="status" class="text-2xl mt-4"></p>
 
 <script>
-    let board = ["", "", "", "", "", "", "", "", ""];
+    let board = Array(9).fill("");
     let currentPlayer = "X";
     let aiMode = false;
     let gameOver = false;
     let difficulty = 0;
     let hasStarted = false;
+    let humanPlayer = null;
+    let aiPlayer = null;
     const difficulties = ["Easy", "Medium", "Hard", "Unbeatable"];
+
+    const winPatterns = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8], 
+        [0, 3, 6], [1, 4, 7], [2, 5, 8], 
+        [0, 4, 8], [2, 4, 6] 
+    ];
 
     function toggleDifficulty() {
         if (hasStarted) return;
@@ -86,20 +94,22 @@
     }
 
     function startGame(ai) {
-    board = ["", "", "", "", "", "", "", "", ""];
-    currentPlayer = "X";
-    aiMode = ai;
-    gameOver = false;
-    hasStarted = false; // Richtige Zurücksetzung
+        board.fill("");
+        currentPlayer = "X";
+        aiMode = ai;
+        gameOver = false;
+        hasStarted = false;
+        humanPlayer = null;
+        aiPlayer = null;
 
-    document.getElementById("status").textContent = "";
-    document.querySelectorAll(".cell").forEach(cell => {
-        cell.textContent = "";
-        cell.classList.remove("winner");
-    });
+        document.getElementById("status").textContent = "";
+        document.querySelectorAll(".cell").forEach(cell => {
+            cell.textContent = "";
+            cell.classList.remove("winner");
+        });
 
-    enableButtons(); // Buttons wieder aktivieren
-}
+        enableButtons();
+    }
 
     function makeMove(index) {
         if (board[index] || gameOver) return;
@@ -107,15 +117,19 @@
         if (!hasStarted) {
             hasStarted = true;
             disableButtons();
+            humanPlayer = currentPlayer;
+            aiPlayer = humanPlayer === "X" ? "O" : "X";
         }
+
+        if (aiMode && currentPlayer !== humanPlayer) return;
 
         board[index] = currentPlayer;
         document.querySelectorAll(".cell")[index].textContent = currentPlayer;
 
-        let winningPattern = checkWinner();
-        if (winningPattern) {
+        let winner = checkWinner();
+        if (winner) {
             document.getElementById("status").textContent = `${currentPlayer} Won!`;
-            highlightWinner(winningPattern);
+            highlightWinner(winner);
             gameOver = true;
             setTimeout(() => startGame(aiMode), 2000);
             return;
@@ -130,24 +144,46 @@
 
         currentPlayer = currentPlayer === "X" ? "O" : "X";
 
-        if (aiMode && currentPlayer === "O" && !gameOver) {
+        if (aiMode && currentPlayer === aiPlayer && !gameOver) {
             setTimeout(aiMove, 500);
         }
     }
 
     function aiMove() {
-        let bestMove;
-        switch (difficulty) {
-            case 0: bestMove = easyMove(); break;
-            case 1: bestMove = mediumMove(); break;
-            case 2: bestMove = hardMove(); break;
-            case 3: // Unschlagbar (Minimax)
-                let minimaxResult = minimax(board, "O");
-                bestMove = minimaxResult.index !== undefined ? minimaxResult.index : easyMove();
-                break;
-        }
-        makeMove(bestMove);
+    let bestMove;
+    switch (difficulty) {
+        case 0: bestMove = easyMove(); break;
+        case 1: bestMove = mediumMove(); break;
+        case 2: bestMove = hardMove(); break;
+        case 3: bestMove = unbeatableMove(); break;
     }
+    aiMakeMove(bestMove);
+}
+
+function aiMakeMove(index) {
+    if (board[index] || gameOver) return;
+
+    board[index] = aiPlayer;
+    document.querySelectorAll(".cell")[index].textContent = aiPlayer;
+
+    let winner = checkWinner();
+    if (winner) {
+        document.getElementById("status").textContent = `${aiPlayer} Won!`;
+        highlightWinner(winner);
+        gameOver = true;
+        setTimeout(() => startGame(aiMode), 2000);
+        return;
+    }
+
+    if (board.every(cell => cell !== "")) {
+        document.getElementById("status").textContent = "Draw!";
+        gameOver = true;
+        setTimeout(() => startGame(aiMode), 2000);
+        return;
+    }
+
+    currentPlayer = humanPlayer;
+}
 
     function easyMove() {
         let emptyCells = board.map((val, idx) => val === "" ? idx : null).filter(v => v !== null);
@@ -155,28 +191,57 @@
     }
 
     function mediumMove() {
-        return Math.random() < 0.5 ? minimax(board, "O").index : easyMove();
+        return Math.random() > 0.5 ? easyMove() : hardMove();
     }
 
     function hardMove() {
-        return Math.random() < 0.8 ? minimax(board, "O").index : easyMove();
+        let winMove = findWinningMove(aiPlayer);
+        if (winMove !== null) return winMove;
+        let blockMove = findWinningMove(humanPlayer);
+        if (blockMove !== null) return blockMove;
+        return easyMove();
     }
 
-    function minimax(newBoard, player) {
-        let emptyCells = newBoard.map((val, idx) => val === "" ? idx : null).filter(v => v !== null);
+    function unbeatableMove() {
+    let bestMove = minimax(board, aiPlayer).index;
+    return bestMove;
+}
 
-        if (checkWinnerState(newBoard, "X")) return { score: -10 };
-        if (checkWinnerState(newBoard, "O")) return { score: 10 };
-        if (emptyCells.length === 0) return { score: 0 };
+function minimax(newBoard, player) {
+    let emptyCells = newBoard.map((val, idx) => val === "" ? idx : null).filter(v => v !== null);
+    
+    let winner = checkWinnerForMinimax(newBoard);
+    if (winner === humanPlayer) return { score: -10 }; // AI verliert -> schlechte Bewertung
+    if (winner === aiPlayer) return { score: 10 };  // AI gewinnt -> beste Bewertung
+    if (emptyCells.length === 0) return { score: 0 }; // Unentschieden
 
-        let moves = emptyCells.map(i => {
-            newBoard[i] = player;
-            let score = player === "O" ? minimax(newBoard, "X").score : minimax(newBoard, "O").score;
-            newBoard[i] = "";
-            return { index: i, score };
-        });
+    let moves = [];
+    for (let i of emptyCells) {
+        let newBoardCopy = [...newBoard];
+        newBoardCopy[i] = player;
+        let result = minimax(newBoardCopy, player === "X" ? "O" : "X");
+        moves.push({ index: i, score: result.score });
+    }
 
-        return moves.reduce((bestMove, move) => (player === "O" ? move.score > bestMove.score : move.score < bestMove.score) ? move : bestMove);
+    return moves.reduce((best, move) => 
+        (player === aiPlayer ? move.score > best.score : move.score < best.score) ? move : best
+    , { score: player === aiPlayer ? -Infinity : Infinity });
+}
+
+function checkWinnerForMinimax(boardState) {
+    for (let pattern of winPatterns) {
+        let [a, b, c] = pattern;
+        if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+            return boardState[a]; // Gewinner zurückgeben
+        }
+    }
+    return null;
+}
+    
+    function enableButtons() {
+        document.getElementById("mode-btn").classList.remove("disabled");
+        document.getElementById("difficulty-btn").classList.remove("disabled");
+        document.getElementById("ai-btn").classList.remove("disabled");
     }
 
     function disableButtons() {
@@ -185,20 +250,10 @@
         document.getElementById("ai-btn").classList.add("disabled");
     }
 
-    function enableButtons() {
-        document.getElementById("mode-btn").classList.remove("disabled");
-        document.getElementById("difficulty-btn").classList.remove("disabled");
-        document.getElementById("ai-btn").classList.remove("disabled");
-    }
-
     function checkWinner() {
-        const winPatterns = [
-            [0,1,2], [3,4,5], [6,7,8], // Reihen
-            [0,3,6], [1,4,7], [2,5,8], // Spalten
-            [0,4,8], [2,4,6] // Diagonalen
-        ];
         for (let pattern of winPatterns) {
-            if (board[pattern[0]] && board[pattern[0]] === board[pattern[1]] && board[pattern[1]] === board[pattern[2]]) {
+            let [a, b, c] = pattern;
+            if (board[a] && board[a] === board[b] && board[a] === board[c]) {
                 return pattern;
             }
         }
@@ -206,16 +261,19 @@
     }
 
     function highlightWinner(pattern) {
-        pattern.forEach(i => document.querySelectorAll(".cell")[i].classList.add("winner"));
+        pattern.forEach(index => {
+            document.querySelectorAll(".cell")[index].classList.add("winner");
+        });
     }
 
-    function checkWinnerState(testBoard, player) {
-        const winPatterns = [
-            [0,1,2], [3,4,5], [6,7,8], // Reihen
-            [0,3,6], [1,4,7], [2,5,8], // Spalten
-            [0,4,8], [2,4,6] // Diagonalen
-        ];
-        return winPatterns.some(pattern => pattern.every(i => testBoard[i] === player));
+    function findWinningMove(player) {
+        for (let pattern of winPatterns) {
+            let [a, b, c] = pattern;
+            if (board[a] === player && board[b] === player && board[c] === "") return c;
+            if (board[a] === player && board[c] === player && board[b] === "") return b;
+            if (board[b] === player && board[c] === player && board[a] === "") return a;
+        }
+        return null;
     }
 </script>
 
